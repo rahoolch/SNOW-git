@@ -1,0 +1,50 @@
+name: ServiceNow Request Handler
+
+on:
+  repository_dispatch:
+    types: [servicenow-approved]
+
+jobs:
+  create-request-file:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Create request file
+      run: |
+        # Create directory if it doesn't exist
+        mkdir -p servicenow-requests
+        
+        # Extract data from webhook payload
+        REQUEST_ID="${{ github.event.client_payload.request_id }}"
+        DESCRIPTION="${{ github.event.client_payload.description }}"
+        STATUS="${{ github.event.client_payload.status }}"
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        
+        # Create filename with timestamp
+        FILENAME="servicenow-requests/request-${REQUEST_ID}-$(date -u +%Y%m%d-%H%M%S).json"
+        
+        # Create JSON file with request details
+        cat > "$FILENAME" << EOF
+        {
+          "request_id": "$REQUEST_ID",
+          "description": "$DESCRIPTION",
+          "status": "$STATUS",
+          "processed_at": "$TIMESTAMP",
+          "source": "ServiceNow"
+        }
+        EOF
+        
+        echo "Created file: $FILENAME"
+    
+    - name: Commit and push file
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add servicenow-requests/
+        git commit -m "Add ServiceNow request file for ID: ${{ github.event.client_payload.request_id }}"
+        git push
